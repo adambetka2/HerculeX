@@ -6,5 +6,11 @@ from runner.compiled_kernels import APPLE
 
 
 def reader(weights):
-    """Metal and the Neural Engine on a Mac, else the same arithmetic in PyTorch."""
-    return TileReader(weights) if APPLE else PortableReader(weights)
+    """Metal and the Neural Engine on a Mac, else the same arithmetic in PyTorch on a CUDA GPU, never on the CPU."""
+    if APPLE:
+        return TileReader(weights)
+    import torch
+
+    if not torch.cuda.is_available():
+        raise RuntimeError("off macOS the ink reader needs a CUDA GPU, and PyTorch sees none")
+    return PortableReader(weights, "cuda")

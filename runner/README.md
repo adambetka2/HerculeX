@@ -64,7 +64,7 @@ To publish a read scan again, run `./run.sh runner.review_page SCROLL SCAN`.
 | `HERCULEX_BOARD` | `runtime/board/` | Sets the folder for the board's database, logs and dispatcher lock. |
 | `HERCULEX_BOARD_MARGIN_GB` | `1.0` | Sets the memory, in GB, that the board leaves free. |
 | `HERCULEX_BOARD_CORES` | `10` | Sets the number of CPU cores the board shares out. |
-| `HERCULEX_UNIT_ROWS` | `12` | Sets the brick rows of each sheet-detection unit, which the level solve takes whole; fewer need less memory. |
+| `HERCULEX_UNIT_ROWS` | `12` | Sets the brick rows of each sheet-detection unit, which the level solve takes whole; fewer need less memory. Set it before a scan's first `sheets` job: the stage refuses to add units of another size beside the ones a scan has. |
 
 ## Job board
 

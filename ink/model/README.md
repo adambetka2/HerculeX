@@ -14,7 +14,7 @@ Neural Engine.
 | `input_stack.py` | Defines the input: a 17-layer window placed from the stack's written face, with raw values scaled. |
 | `tile_filling.c` | Fills a tile's empty columns from shifted, flipped copies of its own stack. |
 | `portable_reader.py` | Runs the same arithmetic in PyTorch, in float32, on a CPU or a CUDA GPU. Off macOS, `machine_reader.reader()` gives this reader to the ink stage. Start from this file to port the reader to other hardware. |
-| `machine_reader.py` | Gives the reader this machine runs: the tile reader on a Mac, the portable reader elsewhere. It sits apart from `tile_reader.py`, whose bytes are part of the Mac read digest. |
+| `machine_reader.py` | Gives the reader this machine runs: the tile reader on a Mac, the portable reader on a CUDA GPU elsewhere (it stops when there is none). It sits apart from `tile_reader.py`, whose bytes are part of the Mac read digest. |
 
 The tile reader fills empty columns so that per-tile normalization doesn't read the edge of a hole as ink.
 `tests/test_tile_reader_e2e.py` checks the Metal stem and the half-precision Neural Engine body against the float32

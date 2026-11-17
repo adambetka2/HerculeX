@@ -3,6 +3,9 @@
 HerculeX runs on Linux with an NVIDIA GPU. Sheet detection uses a CUDA kernel, the level solve uses OpenMP, and ink is
 read with the PyTorch reader. I tested it on WSL 2 (Ubuntu) with an RTX 5090.
 
+Sheet detection and the ink reader need a CUDA GPU. Without one, the `sheets` and `sheet` jobs stop and say why; they
+don't fall back to the CPU.
+
 ## How it works
 
 | Mac | Linux |
@@ -37,7 +40,8 @@ Use the same commands as on a Mac (see the [README](../README.md#unwrap-a-scroll
 ## Memory
 
 The level solve takes a whole unit of 12 brick rows at once. On a PHerc0841 band it peaked at 6.6 GB. With less memory,
-`HERCULEX_UNIT_ROWS` sets a smaller unit on the `sheets` job.
+`HERCULEX_UNIT_ROWS` sets a smaller unit on the `sheets` job. Set it before a scan's first `sheets` job and keep it: units
+record their size, and the stage refuses to add units of another size, which would overlap them.
 
 ## WSL 2
 

@@ -1,10 +1,8 @@
 """Sheet detection stage: CT bricks to sheet nodes with normals."""
 
-import functools
 import json
 import os
 import shutil
-import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -29,9 +27,9 @@ METHOD = stage_queue.method_of(
     *(HERE / source for source in GPU_SOURCES), HERE / "gpu_nodes.py", HERE / "kernel_bindings.py"
 )
 SAME_OUTPUT = (HERE / "same_output_methods.txt").read_text().split()
-CHUNK_ROWS = int(
-    os.environ.get("HERCULEX_UNIT_ROWS", "12")
-)  # brick rows a unit solves in one piece; fewer need less memory
+# brick rows a unit solves in one piece; fewer need less memory, and a scan keeps the number its units were cut to
+CHUNK_ROWS = int(os.environ.get("HERCULEX_UNIT_ROWS", "12"))
+OLD_UNIT_ROWS = 12  # units recorded before records named their rows were all cut to this
 BAND_ROWS = CHUNK_ROWS
 PER_ROW = 128 // CELL
 EDGE = 2
@@ -81,6 +79,17 @@ def level_shape(row, level):
     return json.load(urlopen(f"{root}/{path.strip('/')}/{level}/.zarray", timeout=60))["shape"]
 
 
+def other_sized_units(out):
+    """Finished units in a nodes folder that were cut to another number of brick rows than CHUNK_ROWS."""
+    return sorted(
+        unit.name
+        for unit in [*out.glob("rows-*"), *out.glob("band-*")]
+        if not unit.name.endswith(".building")
+        and (unit / stage_queue.RECORD).is_file()
+        and stage_queue.record_of(unit).get("unit_rows", OLD_UNIT_ROWS) != CHUNK_ROWS
+    )
+
+
 def jobs(samples, band, volume=None):
     """Every chunk still to do, in the prizes' order."""
     selected = (
@@ -103,6 +112,13 @@ def jobs(samples, band, volume=None):
         shape = level_shape(row, level)
         out = stage_folder(scan_folder(row["sample"], row["volume"], route=NODE_ROUTE), "nodes")
         out.mkdir(parents=True, exist_ok=True)
+        others = other_sized_units(out)
+        if others:
+            raise ValueError(
+                f"{row['sample']} {row['volume']}: {out} holds units not cut to HERCULEX_UNIT_ROWS={CHUNK_ROWS} "
+                f"brick rows ({', '.join(others[:3])}), and new units would overlap them. Run with the number they "
+                "were cut to, or remove this scan's nodes and pieces first."
+            )
         if band:
             rows = -(-shape[0] // 128)
             first = max(0, int((central_row(row, level) or rows / 2) - BAND_ROWS / 2))
@@ -146,28 +162,9 @@ def fetch_chunk(job):
     return work_folder(job)
 
 
-@functools.cache
-def gpu_ready():
-    """Off macOS, whether the CUDA kernel opens; if it doesn't, the reason is printed once and the CPU finds the nodes."""
-    if sys.platform == "darwin":
-        return True
-    try:
-        gpu_nodes.gpu_library()
-    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(
-            f"sheet detection runs on the CPU, several times slower, as CUDA is not usable: {error}",
-            file=sys.stderr,
-            flush=True,
-        )
-        return False
-    return True
-
-
 def detect_store(level, out, record, cell_planes=None, device="gpu"):
     """Packed nodes of a brick store's cell planes, with their record written last."""
     start = time.time()
-    fallback = device == "gpu" and not gpu_ready()
-    device = "cpu" if fallback else device
     store = BrickStore(level)
     Z, Y, X = store.shape
     grid = [-(-Z // CELL), -(-Y // CELL), -(-X // CELL)]
@@ -180,20 +177,16 @@ def detect_store(level, out, record, cell_planes=None, device="gpu"):
                 else (cpu_nodes.detect(store, planes, nodes, cells), 0.0)
             )
         pack_chunk(part)
-        record = (
-            record
-            | {
-                "shape": list(store.shape),
-                "cell": CELL,
-                "grid": grid,
-                "cell_planes": list(planes),
-                "nodes": total,
-                "gpu_seconds": round(gpu, 1),
-                "seconds": round(time.time() - start, 1),
-                "method": METHOD,
-            }
-            | ({"device": "cpu"} if fallback else {})
-        )
+        record = record | {
+            "shape": list(store.shape),
+            "cell": CELL,
+            "grid": grid,
+            "cell_planes": list(planes),
+            "nodes": total,
+            "gpu_seconds": round(gpu, 1),
+            "seconds": round(time.time() - start, 1),
+            "method": METHOD,
+        }
         stage_queue.finish(part, record)
     return record
 
@@ -212,6 +205,7 @@ def detect_chunk(job, fetched):
                 "level": job["level"],
                 "voxel_um": row["voxel_um"] * 2 ** job["level"],
                 "rows": list(job["rows"]),
+                "unit_rows": CHUNK_ROWS,
             },
             job["planes"],
         )
@@ -243,6 +237,7 @@ def one_pass(samples, band, volume=None):
 
 
 def run(samples=(), band=False, *, volume=None):
+    gpu_nodes.gpu_library()  # Metal on a Mac, CUDA elsewhere: without it the stage stops before fetching any chunk
     with stage_queue.stage_lock(NODE_ROUTE / "sheet-detector.lock"):
         for _ in range(PASSES):
             if not (failed := one_pass(set(samples), band, volume)):
