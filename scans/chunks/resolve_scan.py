@@ -55,7 +55,7 @@ def resolve(sample, scan, refresh=False):
     """kind -> (url, level) for the kinds the chunk store reads: 'ct', the scan's (masked) OME-Zarr root at level 0."""
     if not refresh:
         cached = {k: v for k, v in array_registry.resolved(sample, scan).items() if k in KINDS}
-        if cached:
+        if cached and not any(".vcd3d." in url for url, _ in cached.values()):
             return cached
     answers, source = from_listing(sample, scan), "listing"
     if not answers:
