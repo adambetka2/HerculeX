@@ -21,7 +21,8 @@ from sampling.column_sampling import bridged_mesh, smoothed_mesh
 from sampling.piece_images import ink_window
 from sampling.sheet_images import across_sheet, extended
 from storage.brick_store import BrickStore
-from unwrapping.layout.mosaic_layout import agreed_turns, mosaics
+from unwrapping.layout.mosaic_layout import agreed_turns, flips, mosaics
+from unwrapping.layout.roll_placement import outward_grid
 from website import site_server
 from website.sheet_tiles import (
     SCAN_UNDER_TAUGHT,
@@ -393,6 +394,23 @@ def test_pieces_joined_into_a_sheet_read_one_face_the_larger_area_keeps_its_own(
     turns = agreed_turns(areas, [(a, b, 50, 1), (b, c, 30, -1), (c, d, 20, 1)])
     assert turns == {a: 1, b: 1, c: -1, d: -1}
     assert agreed_turns({a: 3.0, b: 9.0}, [(a, b, 10, -1)]) == {a: -1, b: 1}
+
+
+def test_a_piece_seen_from_the_middle_is_never_mirrored_and_the_curl_only_sets_its_top():
+    centre = np.array([5000.0, 5000.0])
+    theta = np.linspace(0.3, 0.9, 60)
+    z = 500.0 + 16.0 * np.arange(40)[:, None] + 0 * theta
+    arc = np.stack([centre[0] + 2000.0 * np.cos(theta) + 0 * z, centre[1] + 2000.0 * np.sin(theta) + 0 * z, z])
+    for stored, curl in itertools.product((arc, arc[:, ::-1], arc[:, :, ::-1], arc[:, ::-1, ::-1]), (1, -1)):
+        p = {"rows_up": bool(np.diff(stored[2], axis=0).mean() > 0), "outward": outward_grid(stored, centre)}
+        flip_rows, flip_cols = flips(p, curl)
+        shown = stored[:, ::-1] if flip_rows else stored
+        shown = shown[:, :, ::-1] if flip_cols else shown
+        forward = np.r_[shown[:2, 20, 30] - centre, 0.0]
+        up = np.array([0.0, 0.0, float(curl)])
+        right = np.cross(forward, up)
+        assert (shown[:, 20, 31] - shown[:, 20, 30]) @ right > 0
+        assert (shown[:, 21, 30] - shown[:, 20, 30]) @ up < 0
 
 
 def test_a_sheet_written_on_its_far_side_turns_over_as_one(tmp_path):

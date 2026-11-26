@@ -84,7 +84,7 @@ def summary(unit, row, axis):
 def flips(p, chirality):
     """Rows and columns turned so the piece stands upright seen from the written face, up being +z when the chirality says so."""
     flip_rows = p["rows_up"] == (chirality > 0)
-    return flip_rows, (flip_rows != p["outward"]) if chirality > 0 else (flip_rows == p["outward"])
+    return flip_rows, flip_rows == p["outward"]
 
 
 def frame(p, chirality):
