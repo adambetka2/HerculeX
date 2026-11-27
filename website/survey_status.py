@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 
 from sampling.sheet_images import mosaics_of
-from storage.data_roots import ROUTE_OUTPUTS, stage_folder
+from storage.data_roots import PRODUCTION_FACES, ROUTE_OUTPUTS, stage_folder
 from website.sheet_tiles import written_on_far_side
 
 
@@ -21,7 +21,7 @@ def snapshot(sample, volume, *, use_review=True, root=ROUTE_OUTPUTS):
     records = [json.loads(path.read_text()) for path in sorted((base / "pieces").glob("rows-*/record.json"))]
     if not records:
         records = [json.loads(path.read_text()) for path in sorted((base / "pieces").glob("band-*/record.json"))]
-    image_root = stage_folder(base, "faces") / "level-0"
+    image_root = stage_folder(base, "faces") / PRODUCTION_FACES  # the faces of the model that reads, stock or not
     raw, ink, ink_bytes, raw_bytes, rendered_pixels = [], [], 0, 0, 0
     for p in pieces:
         stem = image_root / p["unit"] / f"piece-{p['piece']:04d}"

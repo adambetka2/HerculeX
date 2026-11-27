@@ -65,8 +65,8 @@ The method follows the published code of the PHerc0343 First Letters entry.
   is the surface and positive depths point away from the scroll axis.
 - **Sweep.** A reader reads a 17-layer window centered on every `d` from -15 to +15, in both stack orders: `outward`
   and `inward` (reversed). You decide from the images which side holds the writing.
-- **Readers.** The sweep reads with every ink model of the library (`./run.sh ink.model.models`): Reader v3 and the
-  checkpoints of the same network listed in `weights/ink/models.json`. Reader v3 alone reads the `original` surface.
+- **Readers.** The sweep reads with every Reader v3 ink model of the library (`./run.sh ink.model.models`): Reader v3 and the
+  checkpoints of the same network listed in `weights/ink/models.json`; Studio models are left out, as they read 16 planes. Reader v3 alone reads the `original` surface.
 - **Images.** Each model's reads are stretched once over all depths, never per depth, from their median to their 99.9th
   percentile; the CT is stretched from its 1st to its 99.5th percentile. The ensemble averages the models' z-scores,
   and `ensemble 5 depths` also averages it over `d-2` to `d+2`. A page opens at the depth where the ensemble's 97th

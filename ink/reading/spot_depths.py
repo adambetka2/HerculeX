@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw
 from ink.model.input_stack import DEPTH, PAST_FACE, face_layer_of
 from ink.model.reader import lane_reader
 from ink.model.stock_model import SURE
-from ink.reading.piece_reading import WEIGHTS, digest
+from ink.reading.piece_reading import STUDIO, WEIGHTS, digest
 from sampling import column_sampling as sampler
 from sampling.piece_images import (
     axis_of_pieces,
@@ -305,6 +305,8 @@ def axis_of(sample, volume):
 
 def read_pieces(sample, volume, pieces, model):
     """Each piece sampled as the full read samples it, two layers deeper either side, and read with its window where the read put it and moved by OFFSETS; kept, so a piece under two spots is read once."""
+    if STUDIO:
+        raise SystemExit("spot depths feed Reader v3's 17-layer windows; HERCULEX_INK_MODEL names a Studio model")
     store_root = work_of(sample) / "pieces"
     store_root.mkdir(parents=True, exist_ok=True)
     wanted = [

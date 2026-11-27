@@ -83,7 +83,8 @@ Two lanes run the same stages: `apple` on a Mac (Metal and the Neural Engine) an
 | Task | Command |
 | --- | --- |
 | Read with another ink model | `./run.sh ink.model.models` lists them; set `HERCULEX_INK_MODEL=NAME` on `unwrap` or the `sheet` job. Its faces and page are its own. |
-| Add a checkpoint of the Reader v3 network | `./run.sh ink.model.models add NAME "TITLE" FILE` |
+| Add a checkpoint of the Reader v3 network | `./run.sh ink.model.models add NAME "TITLE" FILE` with a `.pth` |
+| Add a Studio checkpoint | `./run.sh ink.model.models add NAME "TITLE" FILE.safetensors` checks the file against Studio's network and lists it; the public weights are `./run.sh ink.model.studio_reader fetch`, listed as `studio`. Read with it like any model. |
 | Read apart from the published ink, such as at several depths | `HERCULEX_FACES=NAME HERCULEX_DEPTH_SHIFTS=-4,-2,0,2,4`, then `website.sheet_tiles` and `website.site_pages part` |
 | Republish a read scan | `./run.sh runner.review_page SCROLL SCAN` |
 | Draw a scroll as one picture | `./run.sh website.overview PAGE OUT.jpg` |

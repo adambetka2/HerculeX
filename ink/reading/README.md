@@ -45,7 +45,10 @@ in place for the next attempt.
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `HERCULEX_INK_MODEL` | `reader-v3` | Reads with another ink model of `./run.sh ink.model.models`, into its own faces folder. |
+| `HERCULEX_INK_MODEL` | `reader-v3` | Reads with another ink model of `./run.sh ink.model.models`, into its own faces folder. A Studio model reads 16 planes of each stack as they are, without Reader v3's filling of empty columns, and keeps its own layer stacks; spot depths and passage reads take Reader v3 models only. |
+| `HERCULEX_STUDIO_STRIDE` | `64` | A Studio read's window step: 64 blends overlapping windows with a Hann window, 96 reads each 96-pixel square once, 2.25 times faster, with a grid of tile seams. It is part of the read's digest. |
+| `HERCULEX_STUDIO_BATCH` | `4` | The windows of a Studio forward pass. |
+| `HERCULEX_PRECISION` | `bfloat16` | A Studio read's precision on CUDA; `float32` turns half precision off. |
 | `HERCULEX_SAMPLERS` | `4` | Sets the number of processes that build stacks ahead of the reader. |
 | `HERCULEX_WINDOWS` | `stacks/level/` in the outputs | Sets the folder for kept layer stacks. |
 | `HERCULEX_KEEP_STACKS` | `1` | Set to `0` to skip keeping layer stacks. |

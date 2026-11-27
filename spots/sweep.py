@@ -25,7 +25,9 @@ DEPTHS = tuple(range(-15, 16))
 SIDES = ("inward", "outward")
 WINDOW = 17
 HALF = WINDOW // 2
-WEIGHTS = {name: model.weights for name, model in models.models().items()}
+WEIGHTS = {
+    name: model.weights for name, model in models.models().items() if model.kind == "reader-v3"
+}  # 17-layer windows
 MODELS = tuple(WEIGHTS)
 SURFACES = ("grown", "m7", "original")
 READ_BY = {

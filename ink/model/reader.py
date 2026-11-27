@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from ink.model import studio_reader
 from runner.lane import APPLE
 
 HERE = Path(__file__).parent
@@ -15,8 +16,15 @@ else:
 SOURCES = (*LANE_SOURCES, *SHARED)
 
 
+def sources_of(weights):
+    """The files whose bytes make up a read's digest: Studio's reader for its checkpoints, the lane's for Reader v3's."""
+    return (Path(studio_reader.__file__),) if studio_reader.is_studio(weights) else SOURCES
+
+
 def lane_reader(weights):
-    """Metal and the Neural Engine on the Apple lane; PyTorch on the GPU on the CUDA lane, which stops without one."""
+    """Studio's PyTorch reader for a .safetensors checkpoint; else Metal and the Neural Engine on the Apple lane, PyTorch on the GPU on the CUDA lane, which stops without one."""
+    if studio_reader.is_studio(weights):
+        return studio_reader.StudioReader(weights)
     if APPLE:
         from ink.model.reader_apple.tile_reader import TileReader
 
