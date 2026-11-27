@@ -25,6 +25,7 @@ class Tiny(torch.nn.Module):
 def stand_in(monkeypatch, stride, value=0.0):
     reader = object.__new__(studio.StudioReader)
     reader.torch, reader.device, reader.half, reader.kernel = torch, torch.device("cpu"), False, studio.hann()
+    reader.precision = torch.float16
     reader.model = lambda image: torch.full((image.shape[0], 1, studio.WINDOW, studio.WINDOW), value)
     monkeypatch.setattr(studio, "STRIDE", stride)
     return reader
