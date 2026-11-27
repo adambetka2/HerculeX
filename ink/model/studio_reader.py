@@ -139,7 +139,9 @@ class StudioReader:
         model = network()(deeper=False)
         model.load_state_dict(load_file(str(weights), device="cpu"), strict=True)
         self.model = model.eval().requires_grad_(False).to(self.device)
-        self.half = self.device.type == "cuda" and os.environ.get("HERCULEX_PRECISION", "bfloat16") != "float32"
+        precision = os.environ.get("HERCULEX_PRECISION", "float16")
+        self.half = self.device.type == "cuda" and precision != "float32"
+        self.precision = torch.bfloat16 if precision == "bfloat16" else torch.float16
         self.kernel = hann()
 
     def read(self, stack):
@@ -162,7 +164,7 @@ class StudioReader:
             while batch := list(islice(spots, BATCH)):
                 raw = np.stack([window_at(stack, y - EDGE, x - EDGE) for y, x in batch])
                 image = torch.from_numpy(raw[:, None]).to(self.device, torch.float32).clamp_(0, 200).div_(255)
-                with torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.half):
+                with torch.autocast("cuda", dtype=self.precision, enabled=self.half):
                     logits = self.model(image)
                 kept = logits[:, 0, EDGE : EDGE + KEEP, EDGE : EDGE + KEEP].float().sigmoid().cpu().numpy()
                 for (y, x), p in zip(batch, kept):
