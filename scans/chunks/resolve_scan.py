@@ -20,8 +20,12 @@ def base_name(key):
 
 
 def pick_ct(folders):
-    masked = [f for f in folders if "-masked" in f]
-    return (masked or folders)[0]
+    """The plain masked zarr v2 volume. Since November 2026 the bucket also holds a zarr v3 copy of each scan
+    (`...-masked-fast-q1-c64-v0.3.2.vcd3d.zarr`), which sorts first but which the chunk store cannot read."""
+    readable = [f for f in folders if ".vcd3d." not in f] or folders
+    masked = [f for f in readable if f.rstrip("/").endswith("-masked.zarr")]
+    masked = masked or [f for f in readable if "-masked" in f]
+    return (masked or readable)[0]
 
 
 def from_listing(sample, scan):
@@ -51,7 +55,7 @@ def resolve(sample, scan, refresh=False):
     """kind -> (url, level) for the kinds the chunk store reads: 'ct', the scan's (masked) OME-Zarr root at level 0."""
     if not refresh:
         cached = {k: v for k, v in array_registry.resolved(sample, scan).items() if k in KINDS}
-        if cached:
+        if cached and not any(".vcd3d." in url for url, _ in cached.values()):
             return cached
     answers, source = from_listing(sample, scan), "listing"
     if not answers:
