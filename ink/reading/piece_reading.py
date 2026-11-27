@@ -18,9 +18,9 @@ import numpy as np
 import zstandard
 from PIL import Image
 
-from ink.model import input_stack, models, tiles
+from ink.model import input_stack, models, studio_reader, tiles
 from ink.model.input_stack import DEPTH, PAST_FACE, face_layer_of, scrambled
-from ink.model.reader import SOURCES, lane_reader
+from ink.model.reader import lane_reader, sources_of
 from ink.model.stock_model import SURE, checkpoint_hash
 from runner import events
 from sampling import column_sampling as sampler
@@ -49,6 +49,7 @@ from storage.data_roots import (
 Image.MAX_IMAGE_PIXELS = None  # Faces are generated locally and may exceed Pillow's default limit.
 MODEL = models.chosen()
 WEIGHTS = MODEL.weights
+STUDIO = MODEL.kind == "studio"
 STACK_ROUTE = route_id(ROUTE_OUTPUTS)
 WINDOWS = Path(
     os.environ.get("HERCULEX_WINDOWS", named_folder(INK_LAYER_STACKS, STACK_ROUTE.removesuffix("_route"), STACK_ROUTE))
@@ -57,6 +58,10 @@ SHIFTS = tuple(sorted({0, *map(int, os.environ.get("HERCULEX_DEPTH_SHIFTS", "0")
 UNITS = set(filter(None, os.environ.get("HERCULEX_UNITS", "").split(",")))
 REACH = max(map(abs, SHIFTS))
 CORE_LAYERS = sampler.LAYERS
+if STUDIO and CORE_LAYERS != studio_reader.STACK_LAYERS:
+    raise SystemExit(
+        f"Studio reads planes of a {studio_reader.STACK_LAYERS}-layer stack; the sampler makes {CORE_LAYERS}"
+    )
 if REACH:
     sampler.LAYERS = CORE_LAYERS + 2 * REACH  # Bricks are fetched deep enough for the farthest shift.
 KEEP_FREE_BYTES = 40 * 2**30
@@ -85,8 +90,10 @@ _model_ready = None
 
 def digest():
     model = checkpoint_hash(WEIGHTS)
-    for source in SOURCES:
+    for source in sources_of(WEIGHTS):
         model.update(source.read_bytes())
+    if STUDIO:
+        model.update(f"-stride-{studio_reader.STRIDE}".encode())
     model.update(sampler.SAMPLING.encode())
     if (FACES, SHIFTS) != (PRODUCTION_FACES, (0,)):
         model.update(json.dumps([FACES, SHIFTS]).encode() + Path(input_stack.__file__).read_bytes())
@@ -129,6 +136,26 @@ def depth_reads(kept, measure=None):
     ]
 
 
+def studio_planes(cube, widen=0):
+    """Studio's planes of a stack, in this pipeline's depth order, widened by `widen` planes each way."""
+    first = max((cube.shape[0] - CORE_LAYERS) // 2, 0) + studio_reader.FIRST_PLANE - widen
+    return cube[first : first + studio_reader.PLANE_COUNT + 2 * widen]
+
+
+def studio_reads(kept):
+    """Studio's planes at each shift of SHIFTS out of a window widened by REACH, the production window first; it takes no statistics."""
+    count = studio_reader.PLANE_COUNT
+    return [
+        (np.ascontiguousarray(kept[REACH + shift : REACH + shift + count]), None)
+        for shift in (0, *(s for s in SHIFTS if s))
+    ]
+
+
+def prepared_of(stack):
+    """A stack as the reader takes it: Reader v3's with its empty columns filled, Studio's as it is."""
+    return tiles.PreparedStack(stack, stack.any(axis=0)) if STUDIO else tiles.prepare_stack(stack)
+
+
 def fullest(sheet):
     """Corners of the windows of a piece most covered by sheet."""
     h, w = sheet.shape
@@ -167,6 +194,9 @@ def faces_of(cube, sheet):
     fibres = recto_face(core)
     written = "far" if fibres["face"] == "far" else "near"
     looks = {"fibres": fibres, "near": 0.0, "far": 0.0}
+    if STUDIO:
+        kept = studio_planes(cube[::-1] if written == "far" else cube, REACH)
+        return kept, written, looks, studio_reads(kept), []
     wide = DEPTH + 2 * REACH
     if sheet.sum() < LOOKED_PIXELS:
         kept = window(cube[::-1] if written == "far" else cube, layers=wide)
@@ -220,8 +250,9 @@ def current(path, folder):
 
 def kept_window(folder, *, writing=False):
     """Cache path keyed by the scan as well as the scroll and piece."""
-    production = (FACES, REACH) == (PRODUCTION_FACES, 0)
-    sampling = sampler.SAMPLING if production else f"{sampler.SAMPLING}-{FACES}-{DEPTH + 2 * REACH}-layers"
+    production = (FACES, REACH) == (PRODUCTION_FACES, 0) and not STUDIO
+    planes = (studio_reader.PLANE_COUNT if STUDIO else DEPTH) + 2 * REACH
+    sampling = sampler.SAMPLING if production else f"{sampler.SAMPLING}-{FACES}-{planes}-layers"
     scan = folder.parents[2]
     root = WINDOWS / scan.parent.name
     suffix = Path(sampling) / folder.parent.name / f"{folder.name}.zst"
@@ -345,7 +376,10 @@ def sampled_piece(job):
         if cached:
             face, sheet = kept_face(kept_window(folder)), np.asarray(Image.open(out))
             written = looks.pop("written")
-            stacks, seen = depth_reads(face, tiles.measured(face[REACH : REACH + DEPTH])), []
+            stacks, seen = (
+                studio_reads(face) if STUDIO else depth_reads(face, tiles.measured(face[REACH : REACH + DEPTH])),
+                [],
+            )
         else:
             sheet, central, cube = sampled(folder, axis, turn)
             if ink_is_current(job):
@@ -360,7 +394,7 @@ def sampled_piece(job):
                 }
             face, written, looks, stacks, seen = faces_of(cube, sheet > 0)
         measures = [m for _, m in stacks if m is not None]
-        prepared = [tiles.prepare_stack(stack) for stack, _ in stacks]
+        prepared = [prepared_of(stack) for stack, _ in stacks]
         if cached:
             wait_for_model()
         else:

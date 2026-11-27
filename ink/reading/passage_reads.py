@@ -35,6 +35,8 @@ def read_all(sample, volume, pieces, names):
     """Each piece sampled once from its fetched bricks and read by every model named at every depth of DEPTHS, kept per
     model."""
     known = ink_models.models()
+    if studios := [name for name in names if known[name].kind == "studio"]:
+        raise SystemExit(f"passage reads feed Reader v3's 17-layer windows; {', '.join(studios)} is a Studio model")
     models = {name: known[name].weights for name in names}
     wanted = [
         p
