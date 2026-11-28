@@ -396,20 +396,8 @@ def run(sample, volume):
     print("seam joints", len(joints), "joints inside units", len(inner), round(time.time() - start), flush=True)
     joints = joints + inner
     chirality = scan_chirality(units)
-    turns = agreed_turns({k: p["area"] for k, p in flat.items()}, joint_relations(units, joints, axis))
-    print(
-        "pieces turned to read their sheet's face",
-        sum(t < 0 for t in turns.values()),
-        "of",
-        len(turns),
-        "joined,",
-        round(sum(flat[k]["area"] for k, t in turns.items() if t < 0) / 100),
-        "cm2",
-        flush=True,
-    )
-    for k, p in flat.items():
-        p["turn"] = turns.get(k, 1)
-        p["outward"] = p["outward"] != (p["turn"] < 0)
+    for p in flat.values():
+        p["turn"] = 1
         frame(p, chirality)
     groups, group_of, local = mosaics(keys, flat, joints)
     area = np.array([sum(flat[k]["area"] for k in m) for m in groups])

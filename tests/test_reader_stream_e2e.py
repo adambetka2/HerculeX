@@ -257,6 +257,34 @@ def test_reader_resumes_missing_or_stale_images(tmp_path, monkeypatch):
     assert not reading.done(job)
 
 
+def test_a_window_kept_for_one_face_is_never_read_for_the_other(tmp_path, monkeypatch):
+    reading = piece_reading
+    monkeypatch.setattr(reading, "WINDOWS", tmp_path / "windows")
+    folder = tmp_path / "PHercTEST" / "20990101000000" / "pieces" / "unit" / "piece-0000"
+    folder.mkdir(parents=True)
+    (folder / "meta.json").write_text('{"voxel_um": 9.362, "stride": 16}')
+    os.utime(folder / "meta.json", (1, 1))
+    out = tmp_path / "faces" / "unit" / "piece-0000.png"
+    out.parent.mkdir(parents=True)
+    layers = reading.CORE_LAYERS
+    outer = np.stack([np.full((64, 64), 10 + k, dtype=np.uint8) for k in range(layers)])
+    sheet = np.full((64, 64), 200, dtype=np.uint8)
+
+    def read(turn, model, room):
+        cube = outer if turn > 0 else outer[::-1].copy()
+        monkeypatch.setattr(reading, "sampled", lambda *_: (sheet, cube[layers // 2], cube))
+        monkeypatch.setattr(reading, "KEEP_FREE_BYTES", 0 if room else 2**62)
+        piece = reading.sampled_piece((folder, out, None, turn, model))
+        stacks, shown = reading.opened(piece)
+        reading.written_piece(piece, shown, [np.full(s.values.shape[1:], 0.5, dtype=np.float32) for s, _ in stacks])
+        return int(stacks[-1][0].values[0, 0, 0]), int(reading.window(cube)[0, 0, 0])
+
+    read(1, "a", room=True)
+    read(-1, "a", room=False)
+    got, wanted = read(-1, "b", room=False)
+    assert got == wanted
+
+
 def test_earlier_maps_are_reused_only_for_the_equivalent_checkpoint(tmp_path, monkeypatch):
     reading = piece_reading
     weights = tmp_path / "weights.pth"

@@ -177,11 +177,8 @@ def run(sample, volume):
     )
     standing = seams
     blocks = block_joints(pieces_of)
-    relations = ml.joint_relations(units, standing, axis) + [(j["a"], j["b"], j["edges"], 1) for j in blocks]
-    agreed = ml.agreed_turns({k: p["area"] for k, p in flat.items()}, relations)
-    for k, p in flat.items():
-        p["turn"] = agreed.get(k, 1)
-        p["outward"] = p["outward"] != (p["turn"] < 0)
+    for p in flat.values():
+        p["turn"] = 1
     facing = {}
     for k, p in sorted(flat.items(), key=lambda kv: -kv[1]["area"]):
         facing.setdefault((k[0], source_of(p)), ml.flips(p, curl))

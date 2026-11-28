@@ -399,6 +399,8 @@ def sampled_piece(job):
             wait_for_model()
         else:
             write_faces(out, sheet, central)
+            for earlier in {kept_window(folder), kept_window(folder, writing=True)}:
+                earlier.unlink(missing_ok=True)  # kept for an earlier read, perhaps of the other face
             if KEEP_STACKS:
                 keep(kept_window(folder, writing=True), face)
         block = parcelled(
